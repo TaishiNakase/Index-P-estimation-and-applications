@@ -1,1 +1,3 @@
 # Index-P-estimation-and-applications
+
+This repository includes a collection of R Markdown documents that (1) walk through the features of the Mosquito-borne Viral Suitability Estimator (MVSE) R package that is used to estimate Index P, a climate-based measure of transmission potential of mosquito-borne viruses, and (2) provide examples of how the dataset of Index P spatiotemporal maps might be visualized and analyzed. These documents are meant to provide an overview of the methodology and application of Index P and thus facilitate the reuse and understanding of the generated global maps of dengue transmission potential. 
