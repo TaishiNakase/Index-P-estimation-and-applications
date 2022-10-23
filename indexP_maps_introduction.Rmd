@@ -1,0 +1,138 @@
+---
+title: "Introduction to transmission suitability maps dataset"
+header-includes:
+    - \usepackage{setspace}
+fontsize: 10pt
+output:
+  pdf_document:
+  html_document:
+    toc: yes
+editor_options:
+  chunk_output_type: console
+---
+
+## Preambule
+
+In this document, we provide some example code for the handling and visualization of the transmission suitability maps for DENV transmitted by *Aedes aegypti* mosquitoes. These scripts are meant to provide a brief introduction to the files associated with the dataset and some potential methods of managing the data. 
+
+## Set up
+
+First, we load useful packages. 
+
+\small
+```{r message=FALSE}
+library(raster)
+library(tidyverse)
+library(RColorBrewer)
+```
+\normalsize
+
+We also define the file path to the local directory where the dataset of maps are stored. 
+
+\small
+```{r}
+### INSERT FILE PATH HERE
+indexP_maps_path <- ""
+```
+\normalsize
+
+## Typical year maps
+
+The typical year maps provide an estimate of the seasonal dynamics of Index P for a "typical" calendar year from 1981 to 2019. Here, we display the seasonality of DENV transmission potential during a typical year across Brazil.
+
+\small
+```{r fig.height=5, fig.width=10}
+# `plot_typical_year_maps` takes as an argument the string for the selected country/territory 
+# and plots a grid of 12 Index P maps, one for each calendar month. 
+plot_typical_year_maps <- function(country) {
+  typical_year_map_ext <- "_indexP_typical_year_mean_rasters.tif"
+  file_name <- paste0(country, typical_year_map_ext)
+  file_path <- file.path(indexP_maps_path, country, file_name)
+  
+  mth_mapping <- month.abb
+  names(mth_mapping) <- paste0("X", 1:12)
+  indexP_typical_year_mean_rasters <- raster::brick(file_path) %>% 
+    rasterToPoints() %>% 
+    as.data.frame() %>% 
+    gather(key="layer", value="indexP", "X1":"X12") %>% 
+    mutate(layer=factor(mth_mapping[layer], levels=month.abb))
+
+  # generate outline of Brazil
+  col_scale <- c(colorRampPalette(rev(brewer.pal(11, "RdYlBu"))[1:5])(5), 
+                 colorRampPalette(rev(brewer.pal(11, "RdYlBu"))[6:11])(15), 
+                 rep(rev(brewer.pal(11, "RdYlBu"))[11], 5))
+  world_map <- map_data("world", regions=country)
+  g <- ggplot(data=world_map) + 
+    geom_map(map=world_map, mapping=aes(map_id=country), 
+             color="black", fill="lightgrey", size=1) + 
+    expand_limits(x = world_map$long, y = world_map$lat) + 
+    geom_tile(data=indexP_typical_year_mean_rasters, 
+              mapping=aes(x=x, y=y, fill=indexP)) + 
+    scale_fill_gradientn(colours=rep(col_scale, each=3), 
+                         na.value="white", 
+                         guide=guide_colorbar(frame.colour = "black", ticks.colour = "black"), 
+                         limits=c(0, 4), breaks=seq(0, 4, 1), name="Index P") + 
+    theme(panel.border=element_blank(), panel.grid=element_blank(), 
+          axis.title=element_blank(), axis.text=element_blank(), 
+          axis.ticks=element_blank(), panel.background=element_blank(), 
+          strip.text=element_text(size=9, family="sans"), 
+          legend.title=element_text(size=9, family="sans"), 
+          legend.text=element_text(size=9, family="sans")) + 
+    facet_wrap(~layer, nrow=2)
+  return(g)
+}
+## maps for Brazil
+plot_typical_year_maps(country="Brazil")
+```
+\normalsize
+
+## Monthly time series
+
+We might also be interested in the dynamics of Index P over many years for a particular region. Here, we show the monthly DENV transmission potential in Rio de Janeiro, Brazil from 1981 to 2019. 
+
+\small
+```{r fig.height=3, fig.width=6}
+# `plot_pixel_time_series` takes as arguments a country as well as longitude and latitude 
+# coordinates within the bounds of that country. It returns a plot of the monthly 
+# DENV transmission potential from 1981 to 2019 for the closest spatial pixel. 
+plot_pixel_time_series <- function(country, lon, lat) {
+  monthly_time_series_ext <- "_indexP_monthly_mean_rasters.tif"
+  file_name <- paste0(country, monthly_time_series_ext)
+  file_path <- file.path(indexP_maps_path, country, file_name)
+  monthly_mean_rasters <- raster::brick(file_path)
+  
+  # retrieve data for closest spatial pixel
+  closest_pixel <- monthly_mean_rasters[[1]] %>% 
+    rasterToPoints(., spatial = TRUE) %>% 
+    as.data.frame() %>% 
+    mutate(dist=(lat-y)^2 + (lon-x)^2) %>% 
+    arrange(-desc(dist)) %>% 
+    head(1)
+  location <- data.frame(x=closest_pixel$x, y=closest_pixel$y)
+  coordinates(location) <- ~x+y
+  point = SpatialPoints(location,proj4string = CRS("+init=epsg:4326"))
+  time_series = raster::extract(monthly_mean_rasters, point) %>% as.numeric()
+  dates <- sub('.', '', names(monthly_mean_rasters)) %>% as.Date(., format=c("%Y.%m.%d"))
+  time_series <- data.frame(date=dates, indexP=time_series)
+  
+  g <- ggplot(data=time_series) + 
+    geom_hline(yintercept=1, color="black", linetype="dashed") + 
+    geom_line(mapping=aes(x=date, y=indexP)) + 
+    scale_x_date(breaks=seq(as.Date("1980/1/1"), as.Date("2020/1/1"), "5 years"), 
+                 date_labels = "'%y", limits=as.Date(c("1980-01-01", "2020-03-01")), 
+                 expand=c(0.01, 0.7)) + 
+    labs(y="Mean index P") + 
+    theme_minimal() + 
+    theme(axis.title.x=element_blank(), 
+          axis.line=element_line(),
+          axis.text=element_text(size=8, family="sans", color="black"),
+          panel.border=element_blank(), 
+          panel.grid=element_blank(),
+          axis.title=element_text(size=9, family="sans", color="black"), 
+          axis.ticks=element_line(color="black"), panel.spacing.y=unit(-0.2, "cm"))
+  return(g)
+}
+## monthly time series for Rio de Janerio, Brazil
+plot_pixel_time_series(country="Brazil", lon=-43.196388, lat=-22.908333)
+```
+\normalsize
