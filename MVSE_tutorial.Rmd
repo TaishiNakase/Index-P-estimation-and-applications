@@ -2,39 +2,14 @@
 title: "Short tutorial on new MVSE R package"
 header-includes:
     - \usepackage{setspace}
-fontsize: 12pt
+fontsize: 10pt
 output:
   pdf_document:
   html_document:
     toc: yes
-bibliography: mybib.bib
-csl: elsevier-vancouver.csl
 editor_options:
   chunk_output_type: console
 ---
-
-```{r setup, include = FALSE}
-knitr::knit_hooks$set(
-  margin1 = function(before, options, envir) {
-    if (before) par(mgp = c(1.5, .5, 0), bty = "n", plt = c(.105, .97, .13, .97))
-    else NULL
-  },
-  margin2 = function(before, options, envir) {
-    if (before) par(mgp = c(2, .5, 0), bty = "n", plt = c(.105, .97, .13, .97))
-    else NULL
-  },
-  margin3 = function(before, options, envir) {
-    if (before) par(mgp = c(1.5, .5, 0), bty = "n", mai = rep(.1, 4))
-    else NULL
-  }
-)
-
-knitr::opts_chunk$set(echo       = TRUE,
-                      margin1    = TRUE,
-                      fig.retina = 2,
-                      fig.align  = "center")
-```
-\singlespacing 
 
 ## Preambule
 
@@ -114,13 +89,11 @@ print(example_denv_fit, pars=c("eta", "rho"))
 ```
 \normalsize
 
-We can also have a look at some basic convergence diagnostics of the MCMC sampling procedure using built-in functions. For example, a pairs plot
+We can also have a look at some basic convergence diagnostics of the MCMC sampling procedure using built-in functions. For example, a pairs plot and trace plots.
 \small
 ```{r fig.height=2.5, fig.width=4.5}
 mcmc_pairs(example_denv_fit)
 ```
-\normalsize
-and trace plots.
 \small
 ```{r fig.height=2.5, fig.width=4.5}
 mcmc_traceplot(example_denv_fit)
