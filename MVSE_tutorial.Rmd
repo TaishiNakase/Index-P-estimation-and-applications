@@ -1,0 +1,153 @@
+---
+title: "Short tutorial on new MVSE R package"
+header-includes:
+    - \usepackage{setspace}
+fontsize: 12pt
+output:
+  pdf_document:
+  html_document:
+    toc: yes
+bibliography: mybib.bib
+csl: elsevier-vancouver.csl
+editor_options:
+  chunk_output_type: console
+---
+
+```{r setup, include = FALSE}
+knitr::knit_hooks$set(
+  margin1 = function(before, options, envir) {
+    if (before) par(mgp = c(1.5, .5, 0), bty = "n", plt = c(.105, .97, .13, .97))
+    else NULL
+  },
+  margin2 = function(before, options, envir) {
+    if (before) par(mgp = c(2, .5, 0), bty = "n", plt = c(.105, .97, .13, .97))
+    else NULL
+  },
+  margin3 = function(before, options, envir) {
+    if (before) par(mgp = c(1.5, .5, 0), bty = "n", mai = rep(.1, 4))
+    else NULL
+  }
+)
+
+knitr::opts_chunk$set(echo       = TRUE,
+                      margin1    = TRUE,
+                      fig.retina = 2,
+                      fig.align  = "center")
+```
+\singlespacing 
+
+## Preambule
+
+In this document, we provide a short tutorial of the new version of the MVSE (**M**osquito-borne **V**iral **S**uitability **E**stimator) package for the R programming language. This package is used for the estimation of Index P, a measure of the climate-driven transmission potential of a mosquito-borne virus. Here, we walk through how the package might be applied in practice to estimate Index P time series for a host/vector/virus system in a region of interest, highlighting some its built-in features. 
+
+## Installation 
+
+The MVSE package is currently not hosted on CRAN (Comprehensive R Archive Network). We thus need to install the package directly from the GithHub repo where it is hosted. We use the Github repository \url{https://github.com/TaishiNakase/MVSE}. 
+
+\small
+```{r results='hide', eval=FALSE}
+require(tidyverse)
+require(devtools)
+
+install_github("TaishiNakase/MVSE")
+```
+\normalsize
+
+## Example
+
+Let's go through an example of how to use the MVSE package to estimate Index P for a given region. For this example, we estimate the transmission potential of dengue virus transmitted by \emph{Aedes aegypti} mosquitoes in Feira de Santana (Bahia, Brazil) from 01-01-2015 to 01-01-2017. 
+\small
+```{r results='hide', message=FALSE}
+library(tidyverse)
+library(MVSE)
+```
+\normalsize
+
+### Initialisation of MVSE model
+
+First, we need to initialize a MVSE model. To do so, we need to specify a climate data series (temperature and humidity) for the area of interest and define informed probability distributions for the biological parameters of the selected host/vector/virus system. We will use daily meterological data from 01-01-2015 to 01-01-2017 for the city of Feira de Santana in Bahia, Brazil. This dataset is provided as part of the package. 
+\small
+```{r}
+data("climateFSA")
+head(climateFSA, 9)
+```
+\normalsize
+
+Next, we need to specify the informed probability distributions of the biological parameters (e.g. adult mosquito lifespan, mosquito incubation period, etc.). For this example, we will use the probability distributions provided as part of the package for the transmission of dengue virus by *Aedes aegypti* mosquitoes in a human population. This is specified by setting the model category to "denv_aegypti". Alternatively, you can specify your own probability distributions for these biological parameters via the `priors` argument of the `mvse_model` function. The climate data and the defined probability distributions for the host/vector/virus biological parameters are then used to initialize a MVSE model.
+
+\small
+```{r}
+example_denv_model <- mvse_model(model_name="my_first_model", 
+                                 climate_data=climateFSA, 
+                                 model_category="denv_aegypti", 
+                                 warning=FALSE)
+example_denv_model
+```
+\normalsize
+
+We can use built-in functions to plot the climate data and the probability distributions of the biological parameters. 
+
+\small
+```{r fig.height=3, fig.width=6}
+plot_climate(example_denv_model)
+plot_priors(example_denv_model, c("mosq_life_exp", "mosq_biting_freq", 
+                                  "human_life_exp", "human_inc_per", 
+                                  "human_inf_per"))
+plot_priors(example_denv_model, c("mosq_inc_per"))
+```
+\normalsize
+
+### Estimation of Index P
+
+Once we have initialized the informed probability distributions of the host/vector/virus system and specified the climate data series, we can estimate Index P. For this example, we draw 1 million samples from a single MCMC chain, treating the first 30\% of samples as burn-in. We also extract 1000 samples of the Index P time series. 
+\small
+```{r}
+example_denv_fit <- MVSE::sampling(example_denv_model, iter=10^6, warmup=0.3, 
+                                  verbose=FALSE, samples=10^3, seed=1)
+```
+\normalsize
+
+We can obtain basic summary statistics of the distributions of the scaling coefficients $\eta$ and $\rho$.
+\small
+```{r}
+print(example_denv_fit, pars=c("eta", "rho"))
+```
+\normalsize
+
+We can also have a look at some basic convergence diagnostics of the MCMC sampling procedure using built-in functions. For example, a pairs plot
+\small
+```{r fig.height=2.5, fig.width=4.5}
+mcmc_pairs(example_denv_fit)
+```
+\normalsize
+and trace plots.
+\small
+```{r fig.height=2.5, fig.width=4.5}
+mcmc_traceplot(example_denv_fit)
+```
+\normalsize
+
+We can extract the distribution of Index P as follows. 
+\small
+```{r}
+indexP_dist <- MVSE::extract(example_denv_fit)[["indexP"]]
+head(indexP_dist[, 1:11], 5)
+```
+\normalsize
+
+We can also use a built-in plotting function to quickly plot the distribution of Index P. 
+\small
+```{r fig.height=3, fig.width=6}
+mcmc_index_dist(example_denv_fit, index="indexP") + 
+  theme(legend.position=c(0.8, 0.8), legend.key.size=unit(0.5, "cm"))
+```
+\normalsize
+
+### Conclusion
+
+This workflow can be used to estimate Index P time series for any region with local climate data and for any host/vector/virus system for which there is information on the distribution of the biological parameters relevant to Index P. As the Index P methodology is further refined, the R package will continue to be updated and eventually made accessible on CRAN. 
+\small
+```{r}
+sessionInfo()
+```
+\normalsize
